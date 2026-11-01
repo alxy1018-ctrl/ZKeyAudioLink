@@ -6,10 +6,10 @@ using ZKeyAudioLink.Core.Hotkeys;
 namespace ZKeyAudioLink.App.Services;
 
 /// <summary>
-/// Background global Z key using Raw Input with RIDEV_INPUTSINK. Raw Input is
+/// Background global hotkey using Raw Input with RIDEV_INPUTSINK. Raw Input is
 /// read-only: the key still reaches the focused window, unlike a swallowing
-/// low-level hook. Auto-repeat is suppressed by <see cref="ZKeyState"/>, and
-/// Shift/Ctrl/Alt combinations still count as Z.
+/// low-level hook. Auto-repeat is suppressed by <see cref="HotkeyState"/>;
+/// Shift/Ctrl/Alt combinations still count as the selected key.
 /// </summary>
 public sealed class RawInputHotkeyService : IDisposable
 {
@@ -27,7 +27,7 @@ public sealed class RawInputHotkeyService : IDisposable
     private static readonly IntPtr HWND_MESSAGE = new(-3);
 
     private readonly HwndSource? _source;
-    private readonly ZKeyState _state = new();
+    private readonly HotkeyState _state = new();
     private bool _disposed;
     private bool _enabled;
 
@@ -59,7 +59,10 @@ public sealed class RawInputHotkeyService : IDisposable
     public event Action<string>? Failed;
 
     public bool IsEnabled => _enabled;
+    public HotkeyKey Key => _state.Key;
     public string? LastError { get; private set; }
+
+    public void SetKey(HotkeyKey key) => _state.SetKey(key);
 
     public void SetEnabled(bool enabled)
     {

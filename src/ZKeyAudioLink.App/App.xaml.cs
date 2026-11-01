@@ -9,6 +9,7 @@ using ZKeyAudioLink.Core;
 using ZKeyAudioLink.Core.Audio;
 using ZKeyAudioLink.Core.Configuration;
 using ZKeyAudioLink.Core.Diagnostics;
+using ZKeyAudioLink.Core.Hotkeys;
 using ZKeyAudioLink.Core.Media;
 using ZKeyAudioLink.Core.Playback;
 
@@ -81,9 +82,11 @@ public partial class App : Application
             _tray.ExitRequested += OnTrayExitRequested;
 
             _hotkey = new RawInputHotkeyService();
+            _hotkey.SetKey(HotkeyKeys.GetOrDefault(_store.Settings.HotkeyKey));
             _hotkey.ToggleRequested += OnHotkeyToggleRequested;
             _hotkey.Failed += OnHotkeyFailed;
             _viewModel.HotkeyEnabledChanged += OnHotkeyEnabledChanged;
+            _viewModel.HotkeyKeyChanged += OnHotkeyKeyChanged;
 
             _log.Info("application started", new
             {
@@ -182,6 +185,11 @@ public partial class App : Application
     private void OnHotkeyEnabledChanged(bool enabled)
     {
         _hotkey?.SetEnabled(enabled);
+    }
+
+    private void OnHotkeyKeyChanged(HotkeyKey key)
+    {
+        _hotkey?.SetKey(key);
     }
 
     public void HandleWindowHidden(MainWindow window)

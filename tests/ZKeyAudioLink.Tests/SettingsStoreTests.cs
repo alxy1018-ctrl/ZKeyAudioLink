@@ -13,6 +13,7 @@ public class SettingsStoreTests
         var store = new SettingsStore(path, path + ".bak");
         store.Settings.MicrophoneGain = 1.25f;
         store.Settings.HotkeyEnabled = false;
+        store.Settings.HotkeyKey = "F8";
         store.Settings.Media.Add(new MediaEntry
         {
             DisplayName = "测试",
@@ -25,6 +26,7 @@ public class SettingsStoreTests
         var loaded = new SettingsStore(path, path + ".bak").Load();
         Assert.Equal(1.25f, loaded.MicrophoneGain);
         Assert.False(loaded.HotkeyEnabled);
+        Assert.Equal("F8", loaded.HotkeyKey);
         Assert.Single(loaded.Media);
         Assert.Equal(TimeSpan.FromSeconds(5), loaded.Media[0].StartOffset);
         Assert.False(File.Exists(path + ".tmp"));
@@ -64,6 +66,16 @@ public class SettingsStoreTests
     }
 
     [Fact]
+    public void MissingHotkeyDefaultsToZForOldConfig()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.File("settings.json");
+        File.WriteAllText(path, "{\"version\":1,\"media\":[]}");
+        var loaded = new SettingsStore(path, path + ".bak").Load();
+        Assert.Equal("Z", loaded.HotkeyKey);
+    }
+
+    [Fact]
     public void NormalizesInvalidEntries()
     {
         using var temp = new TempDirectory();
@@ -78,6 +90,7 @@ public class SettingsStoreTests
         });
         store.Settings.SelectedMediaId = Guid.NewGuid();
         store.Settings.MicrophoneGain = 99f;
+        store.Settings.HotkeyKey = "NotAKey";
         Assert.True(store.Save());
 
         var loaded = new SettingsStore(path, path + ".bak").Load();
@@ -87,5 +100,6 @@ public class SettingsStoreTests
         Assert.Equal(string.Empty, loaded.Media[0].LibraryFileName);
         Assert.Null(loaded.SelectedMediaId);
         Assert.Equal(4f, loaded.MicrophoneGain);
+        Assert.Equal("Z", loaded.HotkeyKey);
     }
 }

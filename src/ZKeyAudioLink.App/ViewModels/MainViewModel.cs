@@ -8,6 +8,7 @@ using ZKeyAudioLink.Core;
 using ZKeyAudioLink.Core.Audio;
 using ZKeyAudioLink.Core.Configuration;
 using ZKeyAudioLink.Core.Diagnostics;
+using ZKeyAudioLink.Core.Hotkeys;
 using ZKeyAudioLink.Core.Media;
 using ZKeyAudioLink.Core.Playback;
 
@@ -48,6 +49,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private bool _isBusy;
     private string _busyText = string.Empty;
     private bool _hotkeyEnabled = true;
+    private HotkeyKey _selectedHotkeyKey = HotkeyKeys.Default;
     private bool _engineCanPlay;
     private bool _canPlay;
     private double _micGainPercent = 100;
@@ -113,6 +115,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _controller.Notice += OnControllerNotice;
 
         _hotkeyEnabled = store.Settings.HotkeyEnabled;
+        _selectedHotkeyKey = HotkeyKeys.GetOrDefault(store.Settings.HotkeyKey);
         LoadMediaList(store.Settings.SelectedMediaId);
         LoadVolumes();
         _initialized = true;
@@ -136,6 +139,44 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public RelayCommand DismissBannerCommand { get; }
 
     public event Action<bool>? HotkeyEnabledChanged;
+    public event Action<HotkeyKey>? HotkeyKeyChanged;
+
+    public IReadOnlyList<HotkeyKey> HotkeyOptions => HotkeyKeys.All;
+
+    public HotkeyKey SelectedHotkeyKey
+    {
+        get => _selectedHotkeyKey;
+        set
+        {
+            var key = value ?? HotkeyKeys.Default;
+            if (!SetProperty(ref _selectedHotkeyKey, key))
+            {
+                return;
+            }
+
+            OnPropertyChanged(
+                nameof(HotkeyDisplayName),
+                nameof(HotkeyHeaderText),
+                nameof(HotkeyHintText),
+                nameof(PlayKeyHintText),
+                nameof(HotkeyStatusText));
+
+            if (!_initialized)
+            {
+                return;
+            }
+
+            _store.Settings.HotkeyKey = key.Name;
+            _store.Save();
+            HotkeyKeyChanged?.Invoke(key);
+            ShowBanner($"播放快捷键已改为 {key.DisplayName}。", error: false, autoHide: true);
+        }
+    }
+
+    public string HotkeyDisplayName => _selectedHotkeyKey.DisplayName;
+    public string HotkeyHeaderText => $"全局 {HotkeyDisplayName}";
+    public string HotkeyHintText => $"全局按 {HotkeyDisplayName} 播放 / 停止";
+    public string PlayKeyHintText => $"（{HotkeyDisplayName}）";
 
     public MediaItemViewModel? SelectedItem
     {
@@ -346,11 +387,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             _store.Save();
             HotkeyEnabledChanged?.Invoke(value);
             OnPropertyChanged(nameof(HotkeyStatusText));
-            ShowBanner(value ? "全局 Z 已启用。" : "全局 Z 已关闭，仍可用界面按钮播放。", error: false, autoHide: true);
+            ShowBanner(
+                value ? $"全局 {HotkeyDisplayName} 已启用。" : $"全局 {HotkeyDisplayName} 已关闭，仍可用界面按钮播放。",
+                error: false,
+                autoHide: true);
         }
     }
 
-    public string HotkeyStatusText => HotkeyEnabled ? "全局 Z：已启用" : "全局 Z：已关闭";
+    public string HotkeyStatusText => HotkeyEnabled
+        ? $"全局 {HotkeyDisplayName}：已启用"
+        : $"全局 {HotkeyDisplayName}：已关闭";
 
     public bool CanPlay
     {
@@ -459,7 +505,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _routeHint, value);
     }
 
-    public string AppVersion => "1.0.0";
+    public string AppVersion => "1.0.1";
 
     public void InitializeAfterEngineStart()
     {
@@ -1131,4 +1177,5 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _controller.Notice -= OnControllerNotice;
     }
 }
+
 

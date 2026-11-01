@@ -145,6 +145,7 @@ public sealed class SettingsStore
     private static AppSettings Normalize(AppSettings settings)
     {
         settings.Version = Math.Max(settings.Version, 1);
+        settings.HotkeyKey = ZKeyAudioLink.Core.Hotkeys.HotkeyKeys.GetOrDefault(settings.HotkeyKey).Name;
         settings.Media ??= new List<MediaEntry>();
         foreach (var entry in settings.Media)
         {

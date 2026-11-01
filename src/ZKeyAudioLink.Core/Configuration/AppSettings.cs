@@ -20,6 +20,9 @@ public sealed class AppSettings
 
     public bool HotkeyEnabled { get; set; } = true;
 
+    /// <summary>Stable name from <see cref="ZKeyAudioLink.Core.Hotkeys.HotkeyKeys"/>, default Z.</summary>
+    public string HotkeyKey { get; set; } = "Z";
+
     /// <summary>Persisted geometry of the main window.</summary>
     public double WindowWidth { get; set; }
     public double WindowHeight { get; set; }

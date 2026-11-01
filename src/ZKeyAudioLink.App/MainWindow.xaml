@@ -47,7 +47,7 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                    <TextBlock Text="全局 Z" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <TextBlock Text="{Binding HotkeyHeaderText}" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0" />
                     <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding HotkeyEnabled, Mode=TwoWay}" />
                 </StackPanel>
 
@@ -161,7 +161,7 @@
                                 </StackPanel>
                                 <Border HorizontalAlignment="Right" VerticalAlignment="Top" Background="{StaticResource AccentSoft}"
                                         CornerRadius="8" Padding="10,6">
-                                    <TextBlock Text="全局按 Z 播放 / 停止" FontSize="12" Foreground="{StaticResource Accent}" />
+                                    <TextBlock Text="{Binding HotkeyHintText}" FontSize="12" Foreground="{StaticResource Accent}" />
                                 </Border>
                             </Grid>
 
@@ -190,11 +190,27 @@
                                 <TextBlock Text="{Binding PositionText}" HorizontalAlignment="Right" Style="{StaticResource MonoText}" />
                             </Grid>
 
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="播放快捷键" FontSize="13" Foreground="{StaticResource TextSecondary}"
+                                           VerticalAlignment="Center" />
+                                <ComboBox Grid.Column="1" Margin="12,0,0,0" Height="34"
+                                          ItemsSource="{Binding HotkeyOptions}"
+                                          SelectedItem="{Binding SelectedHotkeyKey, Mode=TwoWay}"
+                                          DisplayMemberPath="DisplayName" />
+                                <TextBlock Grid.Column="2" Text="全局单键；Shift / Ctrl / Alt 不影响" FontSize="11"
+                                           Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="14,0,0,0" />
+                            </Grid>
+
                             <Button Command="{Binding PlayStopCommand}" Style="{StaticResource PrimaryButton}" Height="56" Margin="0,14,0,0">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <TextBlock Text="{Binding PlayGlyph}" FontSize="17" Margin="0,0,10,0" VerticalAlignment="Center" />
                                     <TextBlock Text="{Binding PlayButtonText}" FontSize="17" VerticalAlignment="Center" />
-                                    <TextBlock Text="（Z）" FontSize="12" Opacity="0.75" Margin="8,2,0,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding PlayKeyHintText}" FontSize="12" Opacity="0.75" Margin="8,2,0,0" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
 
