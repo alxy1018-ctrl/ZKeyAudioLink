@@ -1,0 +1,17 @@
+第三方许可摘要
+
+NAudio 3.3.0
+  项目：https://github.com/naudio/NAudio
+  许可：MIT
+
+.NET 10 / WPF
+  项目：https://github.com/dotnet/runtime
+  许可：MIT
+
+VB-CABLE 基础版（不随本软件分发，需用户自行安装）
+  产品页：https://vb-audio.com/Cable/
+  授权页：https://vb-audio.com/Services/licensing.htm
+  许可：Donationware（个人可免费使用；专业用途需付费授权）
+  本软件不捆绑、不静默安装驱动。
+
+完整说明见 docs\第三方许可.md。

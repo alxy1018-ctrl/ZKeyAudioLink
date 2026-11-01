@@ -1,0 +1,21 @@
+# Build outputs
+bin/
+obj/
+publish/
+TestResults/
+scratch/
+*.user
+*.suo
+.vs/
+
+# Local SDK / package caches (never part of the repo)
+.dotnet/
+.dotnet-home/
+.nuget-http-cache/
+.tmp/
+
+# Generated test media
+artifacts/
+
+# Local delivery packages (built zip, friend copy)
+交付/

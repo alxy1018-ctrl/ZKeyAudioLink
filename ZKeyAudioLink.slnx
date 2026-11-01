@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ZKeyAudioLink.App/ZKeyAudioLink.App.csproj" />
+    <Project Path="src/ZKeyAudioLink.Core/ZKeyAudioLink.Core.csproj" />
+    <Project Path="src/ZKeyAudioLink.Doctor/ZKeyAudioLink.Doctor.csproj">
+      <Platform Project="x64" />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ZKeyAudioLink.Tests/ZKeyAudioLink.Tests.csproj" />
+  </Folder>
+</Solution>
