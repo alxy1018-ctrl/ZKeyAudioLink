@@ -4,6 +4,12 @@ Windows 11 桌面小工具：把**真实麦克风**和**本地音频素材**在�
 
 ![主界面（离屏预览，CABLE 已安装）](docs/ui-preview.png)
 
+## 下载
+
+不想自己构建：到 **[Releases](https://github.com/alxy1018-ctrl/ZKeyAudioLink/releases/latest)** 下载 `ZKeyAudioLink-win-x64.zip`（约 67.7 MB，自包含 win-x64，解压双击 `ZKeyAudioLink.exe`）。
+
+首次使用前仍需安装官方基础版 VB-CABLE，见 `docs/用户使用说明.md`。
+
 ## 当前状态（请先读这一节）
 
 - 源码可编译，已发布自包含 `win-x64` 包，并在**没有安装系统 .NET** 的当前机器上通过自包含启动验证。
@@ -22,13 +28,13 @@ Windows 11 桌面小工具：把**真实麦克风**和**本地音频素材**在�
 | `src/ZKeyAudioLink.Core` | 音频引擎、混音、状态机、媒体库、配置、设备 |
 | `src/ZKeyAudioLink.Doctor` | 验证工具：设备枚举、离线渲染、CABLE 回路 / 捕获 |
 | `tests/ZKeyAudioLink.Tests` | 58 个 xUnit 测试 |
-| `publish/ZKeyAudioLink-win-x64.zip` | 自包含可运行包（解压双击） |
+| `publish/`（本地构建，不提交） | 自包含发布产物；分享用 Releases 里的 zip |
 | `docs/` | 使用说明、构建说明、测试记录、技术设计、第三方许可 |
 
 ## 快速开始
 
 1. 按 `docs/用户使用说明.md` 安装官方基础版 VB-CABLE（需要管理员权限和重启）。
-2. 解压 `publish/ZKeyAudioLink-win-x64.zip`，双击 `ZKeyAudioLink.exe`。
+2. 从 [Releases](https://github.com/alxy1018-ctrl/ZKeyAudioLink/releases/latest) 下载 `ZKeyAudioLink-win-x64.zip` 并解压，双击 `ZKeyAudioLink.exe`；或自行构建后使用 `publish\ZKeyAudioLink-win-x64`。
 3. 在软件中选择：真实麦克风、耳机输出、虚拟发送端 `CABLE Input`。
 4. 把 QQ / OOPZ 的**麦克风输入**选为 `CABLE Output`，输出保持耳机。
 5. 导入音频、选中条目、设置开始时间，按 `Z` 播放并同时说话。
