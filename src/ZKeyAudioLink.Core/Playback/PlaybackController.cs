@@ -63,37 +63,45 @@ public sealed class PlaybackController : IDisposable
     public event Action<string>? Error;
     public event Action<string>? Notice;
 
-    public async Task ToggleAsync()
+    public async Task PlayOrReplayAsync()
     {
         await _toggleGate.WaitAsync().ConfigureAwait(false);
         try
         {
             PrepareStartResult startResult = PrepareStartResult.Started;
             var changed = false;
+            var wasActive = false;
+
             lock (_gate)
             {
-                switch (_phase)
+                wasActive = _phase != PlaybackPhase.Idle;
+                if (wasActive)
                 {
-                    case PlaybackPhase.Idle:
-                        startResult = StartPrepareLocked();
-                        changed = startResult == PrepareStartResult.Started;
-                        break;
-                    case PlaybackPhase.Preparing:
-                        StopLocked();
-                        changed = true;
-                        break;
-                    case PlaybackPhase.Playing:
-                        StopLocked();
-                        changed = true;
-                        break;
+                    StopLocked();
                 }
+
+                var entry = _selectedEntry();
+                if (entry is null || entry.Duration <= TimeSpan.Zero)
+                {
+                    startResult = PrepareStartResult.NoSelection;
+                }
+                else
+                {
+                    // Idle 首次播放沿用自定义起点；播放中/准备中的再次按下才从 00:00 重播。
+                    var offset = wasActive ? TimeSpan.Zero : entry.StartOffset;
+                    startResult = StartPrepareLocked(entry, offset);
+                    changed = startResult == PrepareStartResult.Started;
+                }
+
+                changed |= wasActive;
             }
 
             if (changed)
             {
                 RaisePhase();
             }
-            else if (startResult == PrepareStartResult.NoSelection)
+
+            if (startResult == PrepareStartResult.NoSelection)
             {
                 Notice?.Invoke("请先导入并选中一段音频。");
             }
@@ -136,15 +144,9 @@ public sealed class PlaybackController : IDisposable
         await StopAsync().ConfigureAwait(false);
     }
 
-    private PrepareStartResult StartPrepareLocked()
+    private PrepareStartResult StartPrepareLocked(MediaEntry entry, TimeSpan offset)
     {
-        var entry = _selectedEntry();
-        if (entry is null || entry.Duration <= TimeSpan.Zero)
-        {
-            return PrepareStartResult.NoSelection;
-        }
-
-        if (entry.StartOffset < TimeSpan.Zero || entry.StartOffset >= entry.Duration)
+        if (offset < TimeSpan.Zero || offset >= entry.Duration)
         {
             Error?.Invoke("开始时间超出范围，无法播放。");
             return PrepareStartResult.Invalid;
@@ -156,15 +158,15 @@ public sealed class PlaybackController : IDisposable
         var cts = new CancellationTokenSource();
         _prepareCts = cts;
         _phase = PlaybackPhase.Preparing;
-        _prepareTask = PrepareAndPlayAsync(entry, generation, cts.Token);
+        _prepareTask = PrepareAndPlayAsync(entry, generation, offset, cts.Token);
         return PrepareStartResult.Started;
     }
 
-    private async Task PrepareAndPlayAsync(MediaEntry entry, int generation, CancellationToken cancellationToken)
+    private async Task PrepareAndPlayAsync(MediaEntry entry, int generation, TimeSpan offset, CancellationToken cancellationToken)
     {
         try
         {
-            await _engine.PlayMaterialAsync(entry, generation, cancellationToken).ConfigureAwait(false);
+            await _engine.PlayMaterialAsync(entry, generation, offset, cancellationToken).ConfigureAwait(false);
             var started = false;
             lock (_gate)
             {

@@ -43,7 +43,13 @@ public sealed class SettingsStore
         if (primary.Ok)
         {
             Settings = Normalize(primary.Value!);
-            LoadWarning = null;
+            var keyWarning = ResolveHotkeyConflict(Settings);
+            LoadWarning = keyWarning;
+            if (keyWarning is not null)
+            {
+                TrySave(Settings);
+            }
+
             return Settings;
         }
 
@@ -63,7 +69,9 @@ public sealed class SettingsStore
             if (backup.Ok)
             {
                 Settings = Normalize(backup.Value!);
-                LoadWarning = $"配置文件损坏，已从备份恢复。损坏文件保留为 {Path.GetFileName(corrupt)}。";
+                var keyWarning = ResolveHotkeyConflict(Settings);
+                LoadWarning = $"配置文件损坏，已从备份恢复。损坏文件保留为 {Path.GetFileName(corrupt)}。" +
+                              (keyWarning is null ? string.Empty : " " + keyWarning);
                 _log?.Warning("settings restored from backup", new { corrupt = Path.GetFileName(corrupt) });
                 TrySave(Settings);
                 return Settings;
@@ -146,6 +154,7 @@ public sealed class SettingsStore
     {
         settings.Version = Math.Max(settings.Version, 1);
         settings.HotkeyKey = ZKeyAudioLink.Core.Hotkeys.HotkeyKeys.GetOrDefault(settings.HotkeyKey).Name;
+        settings.StopHotkeyKey = ZKeyAudioLink.Core.Hotkeys.HotkeyKeys.GetStopOrDefault(settings.StopHotkeyKey).Name;
         settings.Media ??= new List<MediaEntry>();
         foreach (var entry in settings.Media)
         {
@@ -200,6 +209,20 @@ public sealed class SettingsStore
         }
 
         return settings;
+    }
+
+    private static string? ResolveHotkeyConflict(AppSettings settings)
+    {
+        var play = ZKeyAudioLink.Core.Hotkeys.HotkeyKeys.GetOrDefault(settings.HotkeyKey);
+        var stop = ZKeyAudioLink.Core.Hotkeys.HotkeyKeys.GetStopOrDefault(settings.StopHotkeyKey);
+        if (play != stop)
+        {
+            return null;
+        }
+
+        var resolved = ZKeyAudioLink.Core.Hotkeys.HotkeyKeys.ResolveStopKey(play, stop.Name);
+        settings.StopHotkeyKey = resolved.Name;
+        return $"播放和停止快捷键不能相同（{play.DisplayName}），已自动把停止键改为 {resolved.DisplayName}。";
     }
 
     private static float Sanitize(float value, float min, float max, float fallback) =>

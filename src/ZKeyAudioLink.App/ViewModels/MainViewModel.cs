@@ -50,8 +50,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private string _busyText = string.Empty;
     private bool _hotkeyEnabled = true;
     private HotkeyKey _selectedHotkeyKey = HotkeyKeys.Default;
+    private HotkeyKey _selectedStopHotkeyKey = HotkeyKeys.StopDefault;
     private bool _engineCanPlay;
     private bool _canPlay;
+    private bool _canStop;
     private double _micGainPercent = 100;
     private double _sendGainPercent = 100;
     private double _monitorGainPercent = 80;
@@ -88,7 +90,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
         ImportCommand = new AsyncRelayCommand(ImportAsync, () => !IsBusy);
         DeleteCommand = new AsyncRelayCommand(DeleteAsync, () => SelectedItem is not null && !IsBusy);
-        PlayStopCommand = new AsyncRelayCommand(TogglePlayAsync, () => CanPlay);
+        PlayCommand = new AsyncRelayCommand(PlayOrReplayAsync, () => CanPlay);
+        StopCommand = new AsyncRelayCommand(StopPlaybackAsync, () => CanStop);
         RefreshDevicesCommand = new AsyncRelayCommand(RefreshDevicesAndEngineAsync, () => !IsBusy);
         ReconnectCommand = new AsyncRelayCommand(ReconnectAsync, () => !IsBusy);
         OpenLogsCommand = new RelayCommand(OpenLogs);
@@ -116,6 +119,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
         _hotkeyEnabled = store.Settings.HotkeyEnabled;
         _selectedHotkeyKey = HotkeyKeys.GetOrDefault(store.Settings.HotkeyKey);
+        _selectedStopHotkeyKey = HotkeyKeys.GetStopOrDefault(store.Settings.StopHotkeyKey);
         LoadMediaList(store.Settings.SelectedMediaId);
         LoadVolumes();
         _initialized = true;
@@ -131,7 +135,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public AsyncRelayCommand ImportCommand { get; }
     public AsyncRelayCommand DeleteCommand { get; }
-    public AsyncRelayCommand PlayStopCommand { get; }
+    public AsyncRelayCommand PlayCommand { get; }
+    public AsyncRelayCommand StopCommand { get; }
     public AsyncRelayCommand RefreshDevicesCommand { get; }
     public AsyncRelayCommand ReconnectCommand { get; }
     public RelayCommand OpenLogsCommand { get; }
@@ -140,6 +145,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public event Action<bool>? HotkeyEnabledChanged;
     public event Action<HotkeyKey>? HotkeyKeyChanged;
+    public event Action<HotkeyKey>? StopHotkeyKeyChanged;
 
     public IReadOnlyList<HotkeyKey> HotkeyOptions => HotkeyKeys.All;
 
@@ -149,6 +155,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         set
         {
             var key = value ?? HotkeyKeys.Default;
+            if (key == _selectedStopHotkeyKey)
+            {
+                OnPropertyChanged(nameof(SelectedHotkeyKey));
+                ShowBanner("播放快捷键不能与停止快捷键相同，请先改另一个。", error: true, autoHide: false);
+                return;
+            }
+
             if (!SetProperty(ref _selectedHotkeyKey, key))
             {
                 return;
@@ -173,10 +186,49 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    public HotkeyKey SelectedStopHotkeyKey
+    {
+        get => _selectedStopHotkeyKey;
+        set
+        {
+            var key = value ?? HotkeyKeys.StopDefault;
+            if (key == _selectedHotkeyKey)
+            {
+                OnPropertyChanged(nameof(SelectedStopHotkeyKey));
+                ShowBanner("停止快捷键不能与播放快捷键相同，请先改另一个。", error: true, autoHide: false);
+                return;
+            }
+
+            if (!SetProperty(ref _selectedStopHotkeyKey, key))
+            {
+                return;
+            }
+
+            OnPropertyChanged(
+                nameof(StopHotkeyDisplayName),
+                nameof(HotkeyHeaderText),
+                nameof(HotkeyHintText),
+                nameof(StopKeyHintText),
+                nameof(HotkeyStatusText));
+
+            if (!_initialized)
+            {
+                return;
+            }
+
+            _store.Settings.StopHotkeyKey = key.Name;
+            _store.Save();
+            StopHotkeyKeyChanged?.Invoke(key);
+            ShowBanner($"停止快捷键已改为 {key.DisplayName}。", error: false, autoHide: true);
+        }
+    }
+
     public string HotkeyDisplayName => _selectedHotkeyKey.DisplayName;
-    public string HotkeyHeaderText => $"全局 {HotkeyDisplayName}";
-    public string HotkeyHintText => $"全局按 {HotkeyDisplayName} 播放 / 停止";
+    public string StopHotkeyDisplayName => _selectedStopHotkeyKey.DisplayName;
+    public string HotkeyHeaderText => $"播放 {HotkeyDisplayName} · 停止 {StopHotkeyDisplayName}";
+    public string HotkeyHintText => $"{HotkeyDisplayName} 播放/重播 · {StopHotkeyDisplayName} 停止";
     public string PlayKeyHintText => $"（{HotkeyDisplayName}）";
+    public string StopKeyHintText => $"（{StopHotkeyDisplayName}）";
 
     public MediaItemViewModel? SelectedItem
     {
@@ -388,15 +440,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             HotkeyEnabledChanged?.Invoke(value);
             OnPropertyChanged(nameof(HotkeyStatusText));
             ShowBanner(
-                value ? $"全局 {HotkeyDisplayName} 已启用。" : $"全局 {HotkeyDisplayName} 已关闭，仍可用界面按钮播放。",
+                value
+                    ? $"全局快捷键已启用：{HotkeyDisplayName} 播放/重播，{StopHotkeyDisplayName} 停止。"
+                    : "全局快捷键已关闭，仍可用界面按钮播放/重播和停止。",
                 error: false,
                 autoHide: true);
         }
     }
 
     public string HotkeyStatusText => HotkeyEnabled
-        ? $"全局 {HotkeyDisplayName}：已启用"
-        : $"全局 {HotkeyDisplayName}：已关闭";
+        ? $"播放 {HotkeyDisplayName} / 停止 {StopHotkeyDisplayName}：已启用"
+        : $"播放 {HotkeyDisplayName} / 停止 {StopHotkeyDisplayName}：已关闭";
 
     public bool CanPlay
     {
@@ -405,7 +459,19 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _canPlay, value))
             {
-                PlayStopCommand.RaiseCanExecuteChanged();
+                PlayCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool CanStop
+    {
+        get => _canStop;
+        private set
+        {
+            if (SetProperty(ref _canStop, value))
+            {
+                StopCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -505,7 +571,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _routeHint, value);
     }
 
-    public string AppVersion => "1.0.1";
+    public string AppVersion => "1.1.0";
 
     public void InitializeAfterEngineStart()
     {
@@ -674,11 +740,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task TogglePlayAsync()
+    public async Task PlayOrReplayAsync()
     {
         try
         {
-            if (SelectedItem is { } item)
+            // 只有 Idle 的首次播放需要校验/应用自定义起点；重播固定回 00:00。
+            if (_controller.Phase == PlaybackPhase.Idle && SelectedItem is { } item)
             {
                 if (!TimeCode.TryParse(StartTimeText, out var parsed) || parsed < TimeSpan.Zero || parsed >= item.Entry.Duration)
                 {
@@ -693,12 +760,25 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 }
             }
 
-            await _controller.ToggleAsync();
+            await _controller.PlayOrReplayAsync();
         }
         catch (Exception ex)
         {
-            _log.Error("toggle playback failed", ex);
-            ShowBanner($"切换播放失败：{ex.Message}", error: true);
+            _log.Error("play/replay failed", ex);
+            ShowBanner($"播放/重播失败：{ex.Message}", error: true);
+        }
+    }
+
+    public async Task StopPlaybackAsync()
+    {
+        try
+        {
+            await _controller.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            _log.Error("stop playback failed", ex);
+            ShowBanner($"停止播放失败：{ex.Message}", error: true);
         }
     }
 
@@ -1036,17 +1116,18 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
                     break;
                 case PlaybackPhase.Preparing:
-                    PlayButtonText = "取消准备";
-                    PlayGlyph = "×";
+                    PlayButtonText = "准备中…";
+                    PlayGlyph = "…";
                     PositionText = "准备中…";
                     break;
                 case PlaybackPhase.Playing:
-                    PlayButtonText = "停止";
-                    PlayGlyph = "■";
+                    PlayButtonText = "重播";
+                    PlayGlyph = "↻";
                     break;
             }
 
             UpdateCanPlay();
+            UpdateCanStop();
         });
     }
 
@@ -1070,6 +1151,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                   (selected is not null && !selected.IsMissing && validStart && _engineCanPlay);
         DeleteCommand.RaiseCanExecuteChanged();
         OnPropertyChanged(nameof(CanDelete));
+    }
+
+    private void UpdateCanStop()
+    {
+        CanStop = _controller.Phase != PlaybackPhase.Idle;
     }
 
     private void OnTimerTick(object? sender, EventArgs e)
@@ -1177,5 +1263,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _controller.Notice -= OnControllerNotice;
     }
 }
+
 
 

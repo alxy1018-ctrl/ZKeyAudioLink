@@ -82,11 +82,16 @@ public partial class App : Application
             _tray.ExitRequested += OnTrayExitRequested;
 
             _hotkey = new RawInputHotkeyService();
-            _hotkey.SetKey(HotkeyKeys.GetOrDefault(_store.Settings.HotkeyKey));
-            _hotkey.ToggleRequested += OnHotkeyToggleRequested;
+            _hotkey.SetKeys(
+                HotkeyKeys.GetOrDefault(_store.Settings.HotkeyKey),
+                HotkeyKeys.GetStopOrDefault(_store.Settings.StopHotkeyKey));
+            _hotkey.PlayRequested += OnHotkeyToggleRequested;
+            _hotkey.StopRequested += OnStopHotkeyRequested;
             _hotkey.Failed += OnHotkeyFailed;
+
             _viewModel.HotkeyEnabledChanged += OnHotkeyEnabledChanged;
             _viewModel.HotkeyKeyChanged += OnHotkeyKeyChanged;
+            _viewModel.StopHotkeyKeyChanged += OnStopHotkeyKeyChanged;
 
             _log.Info("application started", new
             {
@@ -114,6 +119,14 @@ public partial class App : Application
             await _engine!.StartAsync();
             _viewModel!.InitializeAfterEngineStart();
             _hotkey!.SetEnabled(_store!.Settings.HotkeyEnabled);
+            _log?.Info("global hotkeys registered", new
+            {
+                hotkeyEnabled = _store.Settings.HotkeyEnabled,
+                playKey = _hotkey.PlayKey.Name,
+                stopKey = _hotkey.StopKey.Name,
+                enabled = _hotkey.IsEnabled,
+                error = _hotkey.LastError
+            });
             ShowStartupWarnings();
         }
         catch (Exception ex)
@@ -145,7 +158,7 @@ public partial class App : Application
         }
         else if (!status.MonitorAvailable)
         {
-            _viewModel!.ShowExternalError("没有可用的耳机输出，按下 Z 时素材会被阻止播放。请选择耳机输出后重新连接。");
+            _viewModel!.ShowExternalError("没有可用的耳机输出，按播放快捷键时素材会被阻止播放。请选择耳机输出后重新连接。");
         }
         else if (!status.MicrophoneAvailable)
         {
@@ -161,19 +174,43 @@ public partial class App : Application
             return;
         }
 
-        _ = ToggleFromHotkeyAsync();
+        _ = PlayFromHotkeyAsync();
     }
 
-    private async Task ToggleFromHotkeyAsync()
+    private async Task PlayFromHotkeyAsync()
     {
         try
         {
-            await _controller!.ToggleAsync();
+            await _viewModel!.PlayOrReplayAsync();
         }
         catch (Exception ex)
         {
-            _log?.Error("hotkey toggle failed", ex);
-            _viewModel?.ShowExternalError($"按 Z 切换播放失败：{ex.Message}");
+            _log?.Error("play hotkey failed", ex);
+            _viewModel?.ShowExternalError($"按播放快捷键失败：{ex.Message}");
+        }
+    }
+
+    private void OnStopHotkeyRequested()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action(OnStopHotkeyRequested));
+            return;
+        }
+
+        _ = StopFromHotkeyAsync();
+    }
+
+    private async Task StopFromHotkeyAsync()
+    {
+        try
+        {
+            await _viewModel!.StopPlaybackAsync();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error("stop hotkey failed", ex);
+            _viewModel?.ShowExternalError($"按停止快捷键失败：{ex.Message}");
         }
     }
 
@@ -187,9 +224,20 @@ public partial class App : Application
         _hotkey?.SetEnabled(enabled);
     }
 
-    private void OnHotkeyKeyChanged(HotkeyKey key)
+    private void OnHotkeyKeyChanged(HotkeyKey key) => RefreshHotkeyKeys();
+
+    private void OnStopHotkeyKeyChanged(HotkeyKey key) => RefreshHotkeyKeys();
+
+    private void RefreshHotkeyKeys()
     {
-        _hotkey?.SetKey(key);
+        if (_hotkey is null || _store is null)
+        {
+            return;
+        }
+
+        _hotkey.SetKeys(
+            HotkeyKeys.GetOrDefault(_store.Settings.HotkeyKey),
+            HotkeyKeys.GetStopOrDefault(_store.Settings.StopHotkeyKey));
     }
 
     public void HandleWindowHidden(MainWindow window)
@@ -199,7 +247,7 @@ public partial class App : Application
         {
             _store.Settings.TrayHintShown = true;
             _store.Save();
-            _tray?.ShowBalloon("Z 键音频连麦仍在运行", "窗口已隐藏到托盘，全局 Z 继续有效。完全退出会停止麦克风转发，退出前请把 QQ / OOPZ 的输入切回真实麦克风。");
+            _tray?.ShowBalloon("Z 键音频连麦仍在运行", "窗口已隐藏到托盘，播放/停止快捷键继续有效。完全退出会停止麦克风转发，退出前请把 QQ / OOPZ 的输入切回真实麦克风。");
         }
     }
 
@@ -447,8 +495,11 @@ public partial class App : Application
             });
             Console.WriteLine($"SMOKE state={status.State} mic={status.MicrophoneAvailable} send={status.SendAvailable} monitor={status.MonitorAvailable} message={status.Message}");
             smokeHotkey = new RawInputHotkeyService();
+            smokeHotkey.SetKeys(
+                HotkeyKeys.GetOrDefault(store.Settings.HotkeyKey),
+                HotkeyKeys.GetStopOrDefault(store.Settings.StopHotkeyKey));
             smokeHotkey.SetEnabled(true);
-            Console.WriteLine($"SMOKE hotkey enabled={smokeHotkey.IsEnabled} error={smokeHotkey.LastError ?? "none"}");
+            Console.WriteLine($"SMOKE hotkey enabled={smokeHotkey.IsEnabled} error={smokeHotkey.LastError ?? "none"} play={smokeHotkey.PlayKey.Name} stop={smokeHotkey.StopKey.Name}");
             await Task.Delay(1200);
         }
         catch (Exception ex)

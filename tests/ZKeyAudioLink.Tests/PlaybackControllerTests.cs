@@ -23,18 +23,108 @@ public class PlaybackControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task ToggleStartsPlaybackAndStopsFromIdle()
+    public async Task IdlePlayUsesCustomStartOffset()
     {
         var engine = new FakePlaybackEngine();
         var entry = NewEntry();
         using var controller = new PlaybackController(engine, () => entry, _log);
 
-        await controller.ToggleAsync();
+        await controller.PlayOrReplayAsync();
         await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing);
 
-        await controller.ToggleAsync();
-        await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Idle);
-        Assert.Contains(controller.Generation, engine.StoppedGenerations);
+        Assert.Equal(1, engine.PlayCount);
+        Assert.Equal(TimeSpan.FromSeconds(5), engine.Offsets[0]);
+        Assert.Equal(PlaybackPhase.Playing, controller.Phase);
+    }
+
+    [Fact]
+    public async Task PlayingAgainReplaysFromZeroAndStopsPreviousGeneration()
+    {
+        var engine = new FakePlaybackEngine();
+        var entry = NewEntry();
+        using var controller = new PlaybackController(engine, () => entry, _log);
+
+        await controller.PlayOrReplayAsync();
+        await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing);
+        var firstGeneration = controller.Generation;
+
+        await controller.PlayOrReplayAsync();
+        await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing && engine.PlayCount == 2);
+
+        Assert.Equal(new[] { TimeSpan.FromSeconds(5), TimeSpan.Zero }, engine.Offsets);
+        Assert.Equal(firstGeneration, engine.StoppedGenerations[0]);
+        Assert.Equal(2, controller.Generation);
+        Assert.Equal(PlaybackPhase.Playing, controller.Phase);
+    }
+
+    [Fact]
+    public async Task PlayWhilePreparingRestartsFromZero()
+    {
+        var engine = new FakePlaybackEngine();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        engine.PlayHandler = (_, _, _, ct) => gate.Task.WaitAsync(ct);
+        using var controller = new PlaybackController(engine, () => NewEntry(), _log);
+
+        await controller.PlayOrReplayAsync();
+        Assert.Equal(PlaybackPhase.Preparing, controller.Phase);
+
+        await controller.PlayOrReplayAsync();
+        Assert.Equal(PlaybackPhase.Preparing, controller.Phase);
+        Assert.Equal(new[] { TimeSpan.FromSeconds(5), TimeSpan.Zero }, engine.Offsets);
+
+        gate.SetResult();
+        await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing);
+    }
+
+    [Fact]
+    public async Task StopIsIdempotentWhenPlaying()
+    {
+        var engine = new FakePlaybackEngine();
+        using var controller = new PlaybackController(engine, () => NewEntry(), _log);
+
+        await controller.PlayOrReplayAsync();
+        await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing);
+        var generation = controller.Generation;
+
+        await controller.StopAsync();
+        Assert.Equal(PlaybackPhase.Idle, controller.Phase);
+        Assert.Contains(generation, engine.StoppedGenerations);
+
+        var stops = engine.StoppedGenerations.Count;
+        await controller.StopAsync();
+        Assert.Equal(stops, engine.StoppedGenerations.Count);
+        Assert.Equal(PlaybackPhase.Idle, controller.Phase);
+    }
+
+    [Fact]
+    public async Task StopWhilePreparingCancelsWithoutPlaying()
+    {
+        var engine = new FakePlaybackEngine();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        engine.PlayHandler = (_, _, _, ct) => gate.Task.WaitAsync(ct);
+        using var controller = new PlaybackController(engine, () => NewEntry(), _log);
+
+        await controller.PlayOrReplayAsync();
+        Assert.Equal(PlaybackPhase.Preparing, controller.Phase);
+
+        await controller.StopAsync();
+        Assert.Equal(PlaybackPhase.Idle, controller.Phase);
+
+        gate.SetResult();
+        await Task.Delay(100);
+        Assert.Equal(PlaybackPhase.Idle, controller.Phase);
+    }
+
+    [Fact]
+    public async Task StopWhenIdleIsSafe()
+    {
+        var engine = new FakePlaybackEngine();
+        using var controller = new PlaybackController(engine, () => null, _log);
+
+        await controller.StopAsync();
+        Assert.Equal(PlaybackPhase.Idle, controller.Phase);
+        Assert.Empty(engine.StoppedGenerations);
+        Assert.Equal(0, engine.PlayCount);
     }
 
     [Fact]
@@ -45,7 +135,7 @@ public class PlaybackControllerTests : IDisposable
         var notices = new List<string>();
         controller.Notice += notices.Add;
 
-        await controller.ToggleAsync();
+        await controller.PlayOrReplayAsync();
 
         Assert.Single(notices);
         Assert.Equal(PlaybackPhase.Idle, controller.Phase);
@@ -62,7 +152,7 @@ public class PlaybackControllerTests : IDisposable
         var errors = new List<string>();
         controller.Error += errors.Add;
 
-        await controller.ToggleAsync();
+        await controller.PlayOrReplayAsync();
 
         Assert.Single(errors);
         Assert.Equal(0, engine.PlayCount);
@@ -70,51 +160,66 @@ public class PlaybackControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task ToggleWhilePreparingCancelsWithoutPlaying()
+    public async Task PlayAfterStopUsesCustomStartOffsetAgain()
     {
         var engine = new FakePlaybackEngine();
-        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        engine.PlayHandler = async (_, _, ct) => await gate.Task.WaitAsync(ct);
         using var controller = new PlaybackController(engine, () => NewEntry(), _log);
 
-        await controller.ToggleAsync();
-        Assert.Equal(PlaybackPhase.Preparing, controller.Phase);
-
-        await controller.ToggleAsync();
+        await controller.PlayOrReplayAsync();
+        await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing);
+        await controller.StopAsync();
         Assert.Equal(PlaybackPhase.Idle, controller.Phase);
 
-        gate.SetResult();
-        await Task.Delay(100);
-        Assert.Equal(PlaybackPhase.Idle, controller.Phase);
-        Assert.Contains(controller.Generation, engine.StoppedGenerations);
+        await controller.PlayOrReplayAsync();
+        await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing && engine.PlayCount == 2);
+        Assert.Equal(new[] { TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5) }, engine.Offsets);
     }
 
     [Fact]
-    public async Task RapidTogglesDoNotStartACancelledGeneration()
+    public async Task ReplayIgnoresOldGenerationCompletion()
+    {
+        var engine = new FakePlaybackEngine();
+        using var controller = new PlaybackController(engine, () => NewEntry(), _log);
+
+        await controller.PlayOrReplayAsync();
+        await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing);
+        var oldGeneration = controller.Generation;
+
+        await controller.PlayOrReplayAsync();
+        await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing && engine.PlayCount == 2);
+        engine.Complete(oldGeneration, MaterialStopReason.UserStopped);
+        await Task.Delay(100);
+
+        Assert.Equal(PlaybackPhase.Playing, controller.Phase);
+        Assert.Equal(oldGeneration + 1, controller.Generation);
+    }
+
+    [Fact]
+    public async Task RapidReplaysDoNotStartCancelledGenerations()
     {
         var engine = new FakePlaybackEngine();
         var gate1 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var gate2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        engine.PlayHandler = (_, generation, ct) =>
-            generation == 1 ? gate1.Task.WaitAsync(ct) : gate2.Task.WaitAsync(ct);
+        var gate3 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        engine.PlayHandler = (_, generation, _, ct) => generation switch
+        {
+            1 => gate1.Task.WaitAsync(ct),
+            2 => gate2.Task.WaitAsync(ct),
+            _ => gate3.Task.WaitAsync(ct)
+        };
         using var controller = new PlaybackController(engine, () => NewEntry(), _log);
 
-        await controller.ToggleAsync();  // gen 1 preparing
-        await controller.ToggleAsync();  // cancel gen 1
-        await controller.ToggleAsync();  // gen 2 preparing
+        await controller.PlayOrReplayAsync(); // gen 1 preparing
+        await controller.PlayOrReplayAsync(); // gen 2 preparing, gen 1 stopped
+        await controller.PlayOrReplayAsync(); // gen 3 preparing, gen 2 stopped
         Assert.Equal(PlaybackPhase.Preparing, controller.Phase);
+        Assert.Equal(3, engine.Offsets.Count);
 
-        gate2.SetResult();
+        gate1.TrySetResult();
+        gate2.TrySetResult();
+        gate3.SetResult();
         await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing);
-        Assert.Equal(2, controller.Generation);
-
-        var errors = new List<string>();
-        controller.Error += errors.Add;
-        engine.Complete(1, MaterialStopReason.Failed, "stale");
-        await Task.Delay(100);
-
-        Assert.Equal(PlaybackPhase.Playing, controller.Phase);
-        Assert.Empty(errors);
+        Assert.Equal(3, controller.Generation);
     }
 
     [Fact]
@@ -123,12 +228,11 @@ public class PlaybackControllerTests : IDisposable
         var engine = new FakePlaybackEngine();
         using var controller = new PlaybackController(engine, () => NewEntry(), _log);
 
-        await controller.ToggleAsync();
+        await controller.PlayOrReplayAsync();
         await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Playing);
         engine.Complete(controller.Generation, MaterialStopReason.EndOfStream);
 
         await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Idle);
-        Assert.Equal(PlaybackPhase.Idle, controller.Phase);
     }
 
     [Fact]
@@ -136,13 +240,13 @@ public class PlaybackControllerTests : IDisposable
     {
         var engine = new FakePlaybackEngine
         {
-            PlayHandler = (_, _, _) => throw new EngineNotReadyException("设备不可用")
+            PlayHandler = (_, _, _, _) => throw new EngineNotReadyException("设备不可用")
         };
         using var controller = new PlaybackController(engine, () => NewEntry(), _log);
         var errors = new List<string>();
         controller.Error += errors.Add;
 
-        await controller.ToggleAsync();
+        await controller.PlayOrReplayAsync();
         await WaitUntilAsync(() => controller.Phase == PlaybackPhase.Idle);
 
         Assert.Contains("设备不可用", errors);
@@ -178,18 +282,20 @@ internal sealed class FakePlaybackEngine : IPlaybackEngine
 
     public event Action<MaterialCompletion>? MaterialCompleted;
 
-    public Func<MediaEntry, int, CancellationToken, Task>? PlayHandler { get; set; }
+    public Func<MediaEntry, int, TimeSpan, CancellationToken, Task>? PlayHandler { get; set; }
     public int PlayCount { get; private set; }
+    public List<TimeSpan> Offsets { get; } = new();
     public List<int> StoppedGenerations { get; } = new();
 
-    public Task PlayMaterialAsync(MediaEntry entry, int generation, CancellationToken cancellationToken)
+    public Task PlayMaterialAsync(MediaEntry entry, int generation, TimeSpan offset, CancellationToken cancellationToken)
     {
         lock (_gate)
         {
             PlayCount++;
+            Offsets.Add(offset);
         }
 
-        return PlayHandler is null ? Task.CompletedTask : PlayHandler(entry, generation, cancellationToken);
+        return PlayHandler is null ? Task.CompletedTask : PlayHandler(entry, generation, offset, cancellationToken);
     }
 
     public void StopMaterial(int generation)

@@ -27,7 +27,8 @@ public sealed class RawInputHotkeyService : IDisposable
     private static readonly IntPtr HWND_MESSAGE = new(-3);
 
     private readonly HwndSource? _source;
-    private readonly HotkeyState _state = new();
+    private readonly HotkeyState _playState = new();
+    private readonly HotkeyState _stopState = new();
     private bool _disposed;
     private bool _enabled;
 
@@ -55,14 +56,20 @@ public sealed class RawInputHotkeyService : IDisposable
         SystemEvents.SessionSwitch += OnSessionSwitch;
     }
 
-    public event Action? ToggleRequested;
+    public event Action? PlayRequested;
+    public event Action? StopRequested;
     public event Action<string>? Failed;
 
     public bool IsEnabled => _enabled;
-    public HotkeyKey Key => _state.Key;
+    public HotkeyKey PlayKey => _playState.Key;
+    public HotkeyKey StopKey => _stopState.Key;
     public string? LastError { get; private set; }
 
-    public void SetKey(HotkeyKey key) => _state.SetKey(key);
+    public void SetKeys(HotkeyKey play, HotkeyKey stop)
+    {
+        _playState.SetKey(play);
+        _stopState.SetKey(stop);
+    }
 
     public void SetEnabled(bool enabled)
     {
@@ -81,20 +88,22 @@ public sealed class RawInputHotkeyService : IDisposable
             if (TryRegister())
             {
                 _enabled = true;
-                _state.Reset();
+                _playState.Reset();
+                _stopState.Reset();
                 LastError = null;
             }
             else
             {
                 _enabled = false;
-                Failed?.Invoke(LastError ?? "注册全局 Z 热键失败。");
+                Failed?.Invoke(LastError ?? "注册全局快捷键失败。");
             }
         }
         else
         {
             Unregister();
             _enabled = false;
-            _state.Reset();
+            _playState.Reset();
+            _stopState.Reset();
         }
     }
 
@@ -114,7 +123,7 @@ public sealed class RawInputHotkeyService : IDisposable
         }
 
         var error = Marshal.GetLastWin32Error();
-        LastError = $"注册后台键盘失败（Win32 {error}）。Z 热键可能不可用。";
+        LastError = $"注册后台键盘失败（Win32 {error}）。快捷键可能不可用。";
         return false;
     }
 
@@ -141,7 +150,8 @@ public sealed class RawInputHotkeyService : IDisposable
     {
         if (msg == WM_INPUT_DEVICE_CHANGE)
         {
-            _state.Reset();
+            _playState.Reset();
+            _stopState.Reset();
             return IntPtr.Zero;
         }
 
@@ -198,9 +208,17 @@ public sealed class RawInputHotkeyService : IDisposable
         }
 
         var keyboard = MemoryMarshal.Read<RAWKEYBOARD>(buffer.AsSpan(headerSize));
-        if (_state.Handle(header.Device.ToInt64(), keyboard.VKey, keyboard.MakeCode, keyboard.Flags, keyboard.Message))
+        var deviceId = header.Device.ToInt64();
+        var play = _playState.Handle(deviceId, keyboard.VKey, keyboard.MakeCode, keyboard.Flags, keyboard.Message);
+        var stop = _stopState.Handle(deviceId, keyboard.VKey, keyboard.MakeCode, keyboard.Flags, keyboard.Message);
+        if (play)
         {
-            ToggleRequested?.Invoke();
+            PlayRequested?.Invoke();
+        }
+        else if (stop)
+        {
+            // 防御：如果配置异常导致两键相同，播放优先，绝不一次按下触发两个动作。
+            StopRequested?.Invoke();
         }
     }
 
@@ -208,11 +226,16 @@ public sealed class RawInputHotkeyService : IDisposable
     {
         if (e.Mode is PowerModes.Suspend or PowerModes.Resume)
         {
-            _state.Reset();
+            _playState.Reset();
+            _stopState.Reset();
         }
     }
 
-    private void OnSessionSwitch(object sender, SessionSwitchEventArgs e) => _state.Reset();
+    private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
+    {
+        _playState.Reset();
+        _stopState.Reset();
+    }
 
     public void Dispose()
     {

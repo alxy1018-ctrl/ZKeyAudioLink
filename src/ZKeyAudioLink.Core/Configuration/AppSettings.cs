@@ -20,8 +20,11 @@ public sealed class AppSettings
 
     public bool HotkeyEnabled { get; set; } = true;
 
-    /// <summary>Stable name from <see cref="ZKeyAudioLink.Core.Hotkeys.HotkeyKeys"/>, default Z.</summary>
-    public string HotkeyKey { get; set; } = "Z";
+    /// <summary>Stable name from <see cref="ZKeyAudioLink.Core.Hotkeys.HotkeyKeys"/>, default Q.</summary>
+    public string HotkeyKey { get; set; } = "Q";
+
+    /// <summary>Independent stop key, default F8; missing in old configs falls back to F8.</summary>
+    public string StopHotkeyKey { get; set; } = "F8";
 
     /// <summary>Persisted geometry of the main window.</summary>
     public double WindowWidth { get; set; }

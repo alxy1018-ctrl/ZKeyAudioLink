@@ -14,6 +14,7 @@ public class SettingsStoreTests
         store.Settings.MicrophoneGain = 1.25f;
         store.Settings.HotkeyEnabled = false;
         store.Settings.HotkeyKey = "F8";
+        store.Settings.StopHotkeyKey = "F2";
         store.Settings.Media.Add(new MediaEntry
         {
             DisplayName = "测试",
@@ -27,6 +28,7 @@ public class SettingsStoreTests
         Assert.Equal(1.25f, loaded.MicrophoneGain);
         Assert.False(loaded.HotkeyEnabled);
         Assert.Equal("F8", loaded.HotkeyKey);
+        Assert.Equal("F2", loaded.StopHotkeyKey);
         Assert.Single(loaded.Media);
         Assert.Equal(TimeSpan.FromSeconds(5), loaded.Media[0].StartOffset);
         Assert.False(File.Exists(path + ".tmp"));
@@ -66,13 +68,41 @@ public class SettingsStoreTests
     }
 
     [Fact]
-    public void MissingHotkeyDefaultsToZForOldConfig()
+    public void MissingHotkeyDefaultsToQAndStopToF8ForOldConfig()
     {
         using var temp = new TempDirectory();
         var path = temp.File("settings.json");
         File.WriteAllText(path, "{\"version\":1,\"media\":[]}");
         var loaded = new SettingsStore(path, path + ".bak").Load();
+        Assert.Equal("Q", loaded.HotkeyKey);
+        Assert.Equal("F8", loaded.StopHotkeyKey);
+    }
+
+    [Fact]
+    public void ExplicitOldHotkeyIsPreserved()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.File("settings.json");
+        File.WriteAllText(path, "{\"version\":1,\"media\":[],\"hotkeyKey\":\"Z\",\"stopHotkeyKey\":\"F8\"}");
+        var loaded = new SettingsStore(path, path + ".bak").Load();
         Assert.Equal("Z", loaded.HotkeyKey);
+    }
+
+    [Fact]
+    public void ConflictingHotkeysAreResolvedAndReported()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.File("settings.json");
+        var store = new SettingsStore(path, path + ".bak");
+        store.Settings.HotkeyKey = "Q";
+        store.Settings.StopHotkeyKey = "Q";
+        Assert.True(store.Save());
+
+        var loadedStore = new SettingsStore(path, path + ".bak");
+        var loaded = loadedStore.Load();
+        Assert.Equal("Q", loaded.HotkeyKey);
+        Assert.Equal("F8", loaded.StopHotkeyKey);
+        Assert.NotNull(loadedStore.LoadWarning);
     }
 
     [Fact]
@@ -91,6 +121,7 @@ public class SettingsStoreTests
         store.Settings.SelectedMediaId = Guid.NewGuid();
         store.Settings.MicrophoneGain = 99f;
         store.Settings.HotkeyKey = "NotAKey";
+        store.Settings.StopHotkeyKey = "AlsoNotAKey";
         Assert.True(store.Save());
 
         var loaded = new SettingsStore(path, path + ".bak").Load();
@@ -100,6 +131,7 @@ public class SettingsStoreTests
         Assert.Equal(string.Empty, loaded.Media[0].LibraryFileName);
         Assert.Null(loaded.SelectedMediaId);
         Assert.Equal(4f, loaded.MicrophoneGain);
-        Assert.Equal("Z", loaded.HotkeyKey);
+        Assert.Equal("Q", loaded.HotkeyKey);
+        Assert.Equal("F8", loaded.StopHotkeyKey);
     }
 }

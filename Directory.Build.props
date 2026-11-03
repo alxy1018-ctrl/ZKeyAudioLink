@@ -7,11 +7,12 @@
     <DebugType>portable</DebugType>
     <Company>ZKeyAudioLink</Company>
     <Product>Z 键音频连麦</Product>
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
     <Copyright>Copyright (c) 2026</Copyright>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
 </Project>
+
 

@@ -44,7 +44,7 @@
                     <Run FontWeight="SemiBold" Foreground="#16213A" Text="3. 配置通话软件。" />
                     <Run Text="QQ / OOPZ 的麦克风（输入）选 CABLE Output，扬声器（输出）保持耳机。不要静音，不要把输入选成 CABLE Input。" /><LineBreak /><LineBreak />
                     <Run FontWeight="SemiBold" Foreground="#16213A" Text="4. 试音。" />
-                    <Run Text="导入音频、选中条目、设置开始时间，然后按播放快捷键（默认 Z，可在主界面改成其他单键）并同时说话。请对方确认素材和人声都能听到。" /><LineBreak /><LineBreak />
+                    <Run Text="导入音频、选中条目、设置开始时间，按播放快捷键（默认 Q）开始并同时说话。播放中再按同一键会立即从 00:00 重播；按停止快捷键（默认 F8）只停止素材，不中断麦克风转发。两个快捷键都可在主界面改成其他单键。" /><LineBreak /><LineBreak />
                     <Run FontWeight="SemiBold" Foreground="#16213A" Text="5. 退出前。" />
                     <Run Text="先停止素材，再把 QQ / OOPZ 的麦克风切回真实麦克风，最后从托盘退出本软件。" />
                 </TextBlock>
@@ -58,7 +58,7 @@
                     <Run FontWeight="SemiBold" Foreground="#16213A" Text="对方听到自己的回声：" />
                     <Run Text="确认通话软件的输出是耳机；关闭 Windows 的“侦听”；不要捕获系统回放。" /><LineBreak /><LineBreak />
                     <Run FontWeight="SemiBold" Foreground="#16213A" Text="快捷键没反应或连续触发：" />
-                    <Run Text="确认顶部全局快捷键开关打开，并在播放区选好按键。只支持主键盘区单键，Shift / Ctrl / Alt 不改变匹配；长按只触发一次。锁屏、UAC 安全桌面和部分游戏/管理员窗口可能拦截后台按键，这类情况不在承诺范围内。" />
+                    <Run Text="确认顶部全局快捷键开关打开，并在播放区分别选好播放键和停止键；两键不能相同。只支持主键盘区单键，Shift / Ctrl / Alt 不改变匹配；长按只触发一次。锁屏、UAC 安全桌面和部分游戏/管理员窗口可能拦截后台按键，这类情况不在承诺范围内。" />
                 </TextBlock>
 
                 <TextBlock Text="授权与隐私" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,20,0,8" />

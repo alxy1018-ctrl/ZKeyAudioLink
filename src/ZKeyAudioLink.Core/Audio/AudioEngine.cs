@@ -331,7 +331,7 @@ public sealed class AudioEngine : IAsyncDisposable, IPlaybackEngine
         _mix?.SetGains(settings.MicrophoneGain, settings.SendGain, settings.MonitorGain);
     }
 
-    public async Task PlayMaterialAsync(MediaEntry entry, int generation, CancellationToken cancellationToken)
+    public async Task PlayMaterialAsync(MediaEntry entry, int generation, TimeSpan offset, CancellationToken cancellationToken)
     {
         if (_mix is null || _sendSink?.IsStarted != true)
         {
@@ -349,12 +349,12 @@ public sealed class AudioEngine : IAsyncDisposable, IPlaybackEngine
             throw new FileNotFoundException("素材文件不存在，可能已被删除或移动。", path);
         }
 
-        if (entry.StartOffset < TimeSpan.Zero || entry.StartOffset >= entry.Duration)
+        if (offset < TimeSpan.Zero || offset >= entry.Duration)
         {
             throw new EngineNotReadyException("开始时间超出音频时长，无法播放。");
         }
 
-        var source = new FileMaterialSource(path, entry.StartOffset, _log);
+        var source = new FileMaterialSource(path, offset, _log);
         try
         {
             await source.PrefillAsync(cancellationToken).ConfigureAwait(false);
@@ -371,11 +371,11 @@ public sealed class AudioEngine : IAsyncDisposable, IPlaybackEngine
             _sources[generation] = source;
         }
 
-        _mix.StartMaterial(generation, source, entry.StartOffset);
+        _mix.StartMaterial(generation, source, offset);
         _log.Info("material playback requested", new
         {
             file = entry.DisplayName,
-            offset = entry.StartOffset.TotalSeconds,
+            offset = offset.TotalSeconds,
             generation
         });
     }

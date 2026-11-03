@@ -7,7 +7,7 @@ public interface IPlaybackEngine
 {
     event Action<MaterialCompletion>? MaterialCompleted;
 
-    Task PlayMaterialAsync(MediaEntry entry, int generation, CancellationToken cancellationToken);
+    Task PlayMaterialAsync(MediaEntry entry, int generation, TimeSpan offset, CancellationToken cancellationToken);
 
     void StopMaterial(int generation);
 }

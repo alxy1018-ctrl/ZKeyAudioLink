@@ -8,11 +8,14 @@ public class HotkeyStateTests
     private const long KeyboardB = 2;
 
     [Fact]
-    public void DefaultKeyIsZ()
+    public void DefaultKeyIsQAndStopDefaultIsF8()
     {
-        Assert.Equal("Z", HotkeyKeys.Default.Name);
-        Assert.Equal("Z", HotkeyKeys.GetOrDefault(null).Name);
-        Assert.Equal("Z", HotkeyKeys.GetOrDefault("not-a-key").Name);
+        Assert.Equal("Q", HotkeyKeys.Default.Name);
+        Assert.Equal("F8", HotkeyKeys.StopDefault.Name);
+        Assert.Equal("Q", HotkeyKeys.GetOrDefault(null).Name);
+        Assert.Equal("Q", HotkeyKeys.GetOrDefault("not-a-key").Name);
+        Assert.Equal("F8", HotkeyKeys.GetStopOrDefault(null).Name);
+        Assert.Equal("F8", HotkeyKeys.GetStopOrDefault("not-a-key").Name);
     }
 
     [Fact]
@@ -154,11 +157,20 @@ public class HotkeyKeysTests
     [Fact]
     public void CatalogContainsCommonKeysAndStableNames()
     {
+        Assert.Contains(HotkeyKeys.All, k => k.Name == "Q" && k.DisplayName == "Q");
         Assert.Contains(HotkeyKeys.All, k => k.Name == "Z" && k.DisplayName == "Z");
         Assert.Contains(HotkeyKeys.All, k => k.Name == "F8");
         Assert.Contains(HotkeyKeys.All, k => k.Name == "Space" && k.DisplayName == "空格");
         Assert.False(HotkeyKeys.GetOrDefault("Home").UseScanCodeFallback);
         Assert.True(HotkeyKeys.All.Count >= 60);
+    }
+
+    [Fact]
+    public void StopKeyConflictFallbackIsDeterministic()
+    {
+        Assert.Equal("F8", HotkeyKeys.ResolveStopKey(HotkeyKeys.GetOrDefault("Q"), "Q").Name);
+        Assert.Equal("Q", HotkeyKeys.ResolveStopKey(HotkeyKeys.GetOrDefault("F8"), "F8").Name);
+        Assert.Equal("Home", HotkeyKeys.ResolveStopKey(HotkeyKeys.GetOrDefault("F8"), "Home").Name);
     }
 
     [Fact]
@@ -168,6 +180,6 @@ public class HotkeyKeysTests
         Assert.True(HotkeyKeys.TryGet("x", out var x));
         Assert.Equal("X", x.Name);
         Assert.False(HotkeyKeys.TryGet("bogus", out var fallback));
-        Assert.Equal("Z", fallback.Name);
+        Assert.Equal("Q", fallback.Name);
     }
 }

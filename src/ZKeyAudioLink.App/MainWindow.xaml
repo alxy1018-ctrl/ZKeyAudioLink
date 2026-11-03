@@ -206,13 +206,43 @@
                                            Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="14,0,0,0" />
                             </Grid>
 
-                            <Button Command="{Binding PlayStopCommand}" Style="{StaticResource PrimaryButton}" Height="56" Margin="0,14,0,0">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding PlayGlyph}" FontSize="17" Margin="0,0,10,0" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding PlayButtonText}" FontSize="17" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding PlayKeyHintText}" FontSize="12" Opacity="0.75" Margin="8,2,0,0" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="停止快捷键" FontSize="13" Foreground="{StaticResource TextSecondary}"
+                                           VerticalAlignment="Center" />
+                                <ComboBox Grid.Column="1" Margin="12,0,0,0" Height="34"
+                                          ItemsSource="{Binding HotkeyOptions}"
+                                          SelectedItem="{Binding SelectedStopHotkeyKey, Mode=TwoWay}"
+                                          DisplayMemberPath="DisplayName" />
+                                <TextBlock Grid.Column="2" Text="只停止素材；不中断麦克风转发" FontSize="11"
+                                           Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="14,0,0,0" />
+                            </Grid>
+
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Command="{Binding PlayCommand}" Style="{StaticResource PrimaryButton}" Height="56">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <TextBlock Text="{Binding PlayGlyph}" FontSize="17" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding PlayButtonText}" FontSize="17" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding PlayKeyHintText}" FontSize="12" Opacity="0.75" Margin="8,2,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="2" Command="{Binding StopCommand}" Style="{StaticResource SecondaryButton}" Height="56">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <TextBlock Text="■" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="停止" FontSize="16" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding StopKeyHintText}" FontSize="12" Opacity="0.75" Margin="7,2,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
 
                             <Grid Margin="0,18,0,0">
                                 <Grid.ColumnDefinitions>

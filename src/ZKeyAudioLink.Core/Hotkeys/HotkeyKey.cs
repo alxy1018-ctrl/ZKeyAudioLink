@@ -20,7 +20,9 @@ public static class HotkeyKeys
 
     public static IReadOnlyList<HotkeyKey> All => KeyList;
 
-    public static HotkeyKey Default { get; } = KeyList.First(k => k.Name == "Z");
+    public static HotkeyKey Default { get; } = KeyList.First(k => k.Name == "Q");
+
+    public static HotkeyKey StopDefault { get; } = KeyList.First(k => k.Name == "F8");
 
     public static HotkeyKey GetOrDefault(string? name)
     {
@@ -30,6 +32,28 @@ public static class HotkeyKeys
         }
 
         return KeyList.FirstOrDefault(k => string.Equals(k.Name, name, StringComparison.OrdinalIgnoreCase)) ?? Default;
+    }
+
+    public static HotkeyKey GetStopOrDefault(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return StopDefault;
+        }
+
+        return KeyList.FirstOrDefault(k => string.Equals(k.Name, name, StringComparison.OrdinalIgnoreCase)) ?? StopDefault;
+    }
+
+    public static HotkeyKey ResolveStopKey(HotkeyKey play, string? stopName)
+    {
+        var stop = GetStopOrDefault(stopName);
+        if (stop != play)
+        {
+            return stop;
+        }
+
+        // 仅用于损坏/手工改坏的配置做确定性回退；正常 UI 选择会直接拒绝同键。
+        return play.Name == StopDefault.Name ? GetOrDefault("Q") : StopDefault;
     }
 
     public static bool TryGet(string? name, out HotkeyKey key)
